@@ -80,9 +80,14 @@ target_include_directories(RecompiledFuncs PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/librecomp/include
 )
 
-file(WRITE ${CMAKE_SOURCE_DIR}/RecompiledFuncs/___placeholder.c "// this file is just here to make cmake happy")
-file(GLOB FUNC_C_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c)
-file(GLOB FUNC_CXX_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
+file(READ ${CMAKE_SOURCE_DIR}/allofthefuncs.txt ALLOFTHEFUNCS_FILE_CONTENT)
+string(REGEX REPLACE "\n" ";" ALLOFTHEFUNCS_FILE_CONTENT "${ALLOFTHEFUNCS_FILE_CONTENT}")
+foreach(line ${ALLOFTHEFUNCS_FILE_CONTENT})
+    file(WRITE ${CMAKE_SOURCE_DIR}/RecompiledFuncs/${line} "// this file is just here to make cmake happy")
+endforeach()
+
+file(GLOB FUNC_C_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c)
+file(GLOB FUNC_CXX_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
 
 target_sources(RecompiledFuncs PRIVATE ${FUNC_C_SOURCES} ${FUNC_CXX_SOURCES})
 
@@ -147,8 +152,8 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/shadercache/mm_shader_cache.bin)
     )
 endif()
 
-file(WRITE ${CMAKE_SOURCE_DIR}/rsp/___placeholder.cpp "// this file is just here to make cmake happy")
-file(GLOB RSP_SOURCES ${CMAKE_SOURCE_DIR}/rsp/*.cpp)
+file(WRITE ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp "// this file is just here to make cmake happy")
+file(WRITE ${CMAKE_SOURCE_DIR}/rsp/njpgdspMain.cpp "// this file is just here to make cmake happy")
 
 set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/main/main.cpp
@@ -169,7 +174,8 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/ui/ui_color_hack.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_rml_hacks.cpp
 
-    ${RSP_SOURCES}
+    ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp
+    ${CMAKE_SOURCE_DIR}/rsp/njpgdspMain.cpp
 
     ${CMAKE_SOURCE_DIR}/lib/RmlUi/Backends/RmlUi_Platform_SDL.cpp
 )
