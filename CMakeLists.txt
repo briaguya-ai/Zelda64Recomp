@@ -65,6 +65,7 @@ add_custom_target(generate_recompiled_c
 
 # RecompiledFuncs - Library containing the primary recompiler output
 add_library(RecompiledFuncs STATIC)
+add_dependencies(RecompiledFuncs generate_recompiled_c)
 
 target_compile_options(RecompiledFuncs PRIVATE
     # -Wno-unused-but-set-variable
@@ -80,8 +81,8 @@ target_include_directories(RecompiledFuncs PRIVATE
 )
 
 file(WRITE ${CMAKE_SOURCE_DIR}/RecompiledFuncs/___placeholder.c "// this file is just here to make cmake happy")
-file(GLOB FUNC_C_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c)
-file(GLOB FUNC_CXX_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
+file(GLOB FUNC_C_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c)
+file(GLOB FUNC_CXX_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
 
 target_sources(RecompiledFuncs PRIVATE ${FUNC_C_SOURCES} ${FUNC_CXX_SOURCES})
 
@@ -332,6 +333,7 @@ build_vertex_shader(Zelda64Recompiled "shaders/InterfaceVS.hlsl" "shaders/Interf
 build_pixel_shader (Zelda64Recompiled "shaders/InterfacePS.hlsl" "shaders/InterfacePS.hlsl")
 
 target_sources(Zelda64Recompiled PRIVATE ${SOURCES})
+add_dependencies(Zelda64Recompiled generate_recompiled_c)
 
 set_property(TARGET Zelda64Recompiled PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
