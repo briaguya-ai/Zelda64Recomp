@@ -35,6 +35,34 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime)
 
 target_include_directories(rt64 PRIVATE ${CMAKE_BINARY_DIR}/rt64/src)
 
+# Custom targets for generating recompiled c
+include(FetchContent)
+FetchContent_Declare(
+    n64recomp
+    GIT_REPOSITORY https://github.com/N64Recomp/N64Recomp.git
+    GIT_TAG 2a2df89349ff25a3afb3a09617deb3a166efe2f3
+    GIT_SUBMODULES_RECURSE ON
+    EXCLUDE_FROM_ALL
+)
+FetchContent_GetProperties(n64recomp)
+if(NOT n64recomp_POPULATED)
+    FetchContent_Populate(n64recomp)
+endif()
+
+add_custom_target(build_n64recomp
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release -G Ninja -S ${n64recomp_SOURCE_DIR} -B ${n64recomp_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} --build ${n64recomp_BINARY_DIR} --config Release --target N64Recomp -j$$(nproc)
+    COMMAND ${CMAKE_COMMAND} --build ${n64recomp_BINARY_DIR} --config Release --target RSPRecomp -j$$(nproc)
+)
+
+add_custom_target(generate_recompiled_c
+    DEPENDS build_n64recomp
+    COMMAND ${n64recomp_BINARY_DIR}/N64Recomp us.rev1.toml
+    COMMAND ${n64recomp_BINARY_DIR}/RSPRecomp aspMain.us.rev1.toml
+    COMMAND ${n64recomp_BINARY_DIR}/RSPRecomp njpgdspMain.us.rev1.toml
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
 # RecompiledFuncs - Library containing the primary recompiler output
 add_library(RecompiledFuncs STATIC)
 
@@ -51,6 +79,7 @@ target_include_directories(RecompiledFuncs PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/librecomp/include
 )
 
+file(WRITE ${CMAKE_SOURCE_DIR}/RecompiledFuncs/___placeholder.c "// this file is just here to make cmake happy")
 file(GLOB FUNC_C_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c)
 file(GLOB FUNC_CXX_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
 
@@ -98,9 +127,10 @@ add_custom_command(OUTPUT
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/recomp_overlays.inl
                        ${CMAKE_SOURCE_DIR}/RecompiledPatches/funcs.h
                    # TODO: Look into why modifying patches requires two builds to take
-                   COMMAND ./N64Recomp patches.toml
+                   COMMAND ${n64recomp_BINARY_DIR}/N64Recomp patches.toml
                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                    DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.bin
+                   DEPENDS build_n64recomp
 )
 
 # Main executable
@@ -115,6 +145,9 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/shadercache/mm_shader_cache.bin)
         DEPENDS ${CMAKE_SOURCE_DIR}/shadercache/mm_shader_cache.bin
     )
 endif()
+
+file(WRITE ${CMAKE_SOURCE_DIR}/rsp/___placeholder.cpp "// this file is just here to make cmake happy")
+file(GLOB RSP_SOURCES ${CMAKE_SOURCE_DIR}/rsp/*.cpp)
 
 set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/main/main.cpp
@@ -135,8 +168,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/ui/ui_color_hack.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_rml_hacks.cpp
 
-    ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp
-    ${CMAKE_SOURCE_DIR}/rsp/njpgdspMain.cpp
+    ${RSP_SOURCES}
 
     ${CMAKE_SOURCE_DIR}/lib/RmlUi/Backends/RmlUi_Platform_SDL.cpp
 )
