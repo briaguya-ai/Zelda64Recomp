@@ -49,23 +49,31 @@ if(NOT n64recomp_POPULATED)
     FetchContent_Populate(n64recomp)
 endif()
 
-add_custom_target(build_n64recomp
+add_custom_command(
     COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release -G Ninja -S ${n64recomp_SOURCE_DIR} -B ${n64recomp_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} --build ${n64recomp_BINARY_DIR} --config Release --target N64Recomp -j$$(nproc)
     COMMAND ${CMAKE_COMMAND} --build ${n64recomp_BINARY_DIR} --config Release --target RSPRecomp -j$$(nproc)
+    OUTPUT ${n64recomp_BINARY_DIR}/N64Recomp ${n64recomp_BINARY_DIR}/RSPRecomp
 )
 
-add_custom_target(generate_recompiled_c
-    DEPENDS build_n64recomp
+file(READ ${CMAKE_SOURCE_DIR}/allofthefuncs.txt ALLOFTHEFUNCS_FILE_CONTENT)
+string(REGEX REPLACE "\n" ";" ALLOFTHEFUNCS_FILE_CONTENT "${ALLOFTHEFUNCS_FILE_CONTENT}")
+set(FUNC_SOURCES)
+foreach(filename ${ALLOFTHEFUNCS_FILE_CONTENT})
+    list(APPEND FUNC_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/${filename})
+endforeach()
+
+add_custom_command(
+    DEPENDS ${n64recomp_BINARY_DIR}/N64Recomp ${n64recomp_BINARY_DIR}/RSPRecomp
     COMMAND ${n64recomp_BINARY_DIR}/N64Recomp us.rev1.toml
     COMMAND ${n64recomp_BINARY_DIR}/RSPRecomp aspMain.us.rev1.toml
     COMMAND ${n64recomp_BINARY_DIR}/RSPRecomp njpgdspMain.us.rev1.toml
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT ${FUNC_SOURCES} ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp ${CMAKE_SOURCE_DIR}/rsp/njpgdspMain.cpp
 )
 
 # RecompiledFuncs - Library containing the primary recompiler output
 add_library(RecompiledFuncs STATIC)
-add_dependencies(RecompiledFuncs generate_recompiled_c)
 
 target_compile_options(RecompiledFuncs PRIVATE
     # -Wno-unused-but-set-variable
@@ -80,16 +88,7 @@ target_include_directories(RecompiledFuncs PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/librecomp/include
 )
 
-file(READ ${CMAKE_SOURCE_DIR}/allofthefuncs.txt ALLOFTHEFUNCS_FILE_CONTENT)
-string(REGEX REPLACE "\n" ";" ALLOFTHEFUNCS_FILE_CONTENT "${ALLOFTHEFUNCS_FILE_CONTENT}")
-foreach(line ${ALLOFTHEFUNCS_FILE_CONTENT})
-    file(WRITE ${CMAKE_SOURCE_DIR}/RecompiledFuncs/${line} "// this file is just here to make cmake happy")
-endforeach()
-
-file(GLOB FUNC_C_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.c)
-file(GLOB FUNC_CXX_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
-
-target_sources(RecompiledFuncs PRIVATE ${FUNC_C_SOURCES} ${FUNC_CXX_SOURCES})
+target_sources(RecompiledFuncs PRIVATE ${FUNC_SOURCES})
 
 # PatchesLib - Library containing the recompiled output for any custom function patches
 add_library(PatchesLib STATIC)
@@ -136,7 +135,6 @@ add_custom_command(OUTPUT
                    COMMAND ${n64recomp_BINARY_DIR}/N64Recomp patches.toml
                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                    DEPENDS ${CMAKE_SOURCE_DIR}/patches/patches.bin
-                   DEPENDS build_n64recomp
 )
 
 # Main executable
@@ -151,9 +149,6 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/shadercache/mm_shader_cache.bin)
         DEPENDS ${CMAKE_SOURCE_DIR}/shadercache/mm_shader_cache.bin
     )
 endif()
-
-file(WRITE ${CMAKE_SOURCE_DIR}/rsp/aspMain.cpp "// this file is just here to make cmake happy")
-file(WRITE ${CMAKE_SOURCE_DIR}/rsp/njpgdspMain.cpp "// this file is just here to make cmake happy")
 
 set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/main/main.cpp
@@ -339,7 +334,6 @@ build_vertex_shader(Zelda64Recompiled "shaders/InterfaceVS.hlsl" "shaders/Interf
 build_pixel_shader (Zelda64Recompiled "shaders/InterfacePS.hlsl" "shaders/InterfacePS.hlsl")
 
 target_sources(Zelda64Recompiled PRIVATE ${SOURCES})
-add_dependencies(Zelda64Recompiled generate_recompiled_c)
 
 set_property(TARGET Zelda64Recompiled PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
